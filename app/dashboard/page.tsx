@@ -19,6 +19,9 @@ export default function DashboardPage() {
     const [usingDemoData, setUsingDemoData] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [aiSummary, setAiSummary] = useState<string | undefined>();
+    const [aiLoading, setAiLoading] = useState(false);
+
     const selectedWeekStart = useMemo(() => {
         return addDays(baseWeekStart, weekOffset * 7);
     }, [baseWeekStart, weekOffset]);
@@ -61,6 +64,40 @@ export default function DashboardPage() {
     }, [selectedWeekStart, selectedWeekEnd]);
 
     const analysis = analyzeCalendar(events, selectedWeekStart);
+
+    useEffect(() => {
+        async function loadAiSummary() {
+            setAiLoading(true);
+
+            try {
+                const response = await fetch("/api/ai-summary", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        events,
+                        analysis,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error("Could not generate summary");
+                }
+
+                const data = await response.json();
+                setAiSummary(data.summary);
+            } catch {
+                setAiSummary(undefined);
+            } finally {
+                setAiLoading(false);
+            }
+        }
+
+        if (!loading) {
+            loadAiSummary();
+        }
+    }, [events, loading]);
 
     return (
         <main className="min-h-screen bg-slate-100 px-6 py-8 text-slate-950">
@@ -143,7 +180,11 @@ export default function DashboardPage() {
                     <StressScore analysis={analysis} />
 
                     <div className="lg:col-span-2">
-                        <WeekSummary analysis={analysis} />
+                        <WeekSummary
+                            analysis={analysis}
+                            aiSummary={aiSummary}
+                            loading={aiLoading}
+                        />
                     </div>
 
                     <div className="lg:col-span-2">
