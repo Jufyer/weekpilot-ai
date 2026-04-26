@@ -1,4 +1,4 @@
-![icon](https://github.com/[username]/[reponame]/blob/[branch]/image.jpg?raw=true)
+![icon](https://github.com/Jufyer/weekpilot-ai/blob/main/icon.png?raw=true)
 
 # WeekPilot AI
 
