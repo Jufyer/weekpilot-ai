@@ -20,13 +20,14 @@ import type {
     AiProvider,
     AvailabilitySettings as AvailabilitySettingsType,
     CalendarEvent,
-    FreeSlot,
     PlannedStudySuggestion,
     StructuredAiSummary,
     StudyTimeDraft,
 } from "@/lib/types";
 import { StudyPlanSuggestions } from "@/components/StudyPlanSuggestions";
 import { generateStudySuggestions } from "@/lib/studyPlanner";
+import { buildWeekWarnings } from "@/lib/warnings";
+import { ConflictWarnings } from "@/components/ConflictWarnings";
 
 const defaultModelByProvider: Record<AiProvider, string> = {
     ollama: "llama3.2",
@@ -154,6 +155,15 @@ export default function DashboardPage() {
         );
     }, [mergedEvents, selectedWeekStart, availabilitySettings]);
 
+    const warnings = useMemo(() => {
+        return buildWeekWarnings({
+            events: mergedEvents,
+            analysis,
+            plannedSuggestions,
+            weekStart: selectedWeekStart,
+        });
+    }, [mergedEvents, analysis, plannedSuggestions, selectedWeekStart]);
+
     function resetAiOutput() {
         setAiSummary(undefined);
         setAiError(null);
@@ -250,7 +260,10 @@ export default function DashboardPage() {
     }
 
     function handleAutoPlanWeek() {
-        const suggestions = generateStudySuggestions(analysis.freeSlots, 4);
+        const suggestions = generateStudySuggestions(analysis.freeSlots, 4, {
+            events: mergedEvents,
+            weekStart: selectedWeekStart,
+        });
         setPlannedSuggestions(suggestions);
         setCalendarActionMessage(
             suggestions.length > 0
@@ -505,7 +518,8 @@ export default function DashboardPage() {
                 <div className="mb-5 flex flex-wrap gap-3">
                     <button
                         onClick={handleAutoPlanWeek}
-                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white"
+                        disabled={analysis.freeSlots.length === 0}
+                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-slate-400"
                     >
                         Auto-plan my week
                     </button>
@@ -519,21 +533,26 @@ export default function DashboardPage() {
                         </button>
                     )}
 
-                    {plannedSuggestions.length > 0 && (
-                        <div className="mb-5">
-                            <StudyPlanSuggestions
-                                suggestions={plannedSuggestions}
-                                addingSuggestionId={addingSuggestionId}
-                                addingAll={addingAllSuggestions}
-                                onAddOne={handleAddOneSuggestion}
-                                onAddAll={handleAddAllSuggestions}
-                            />
-                        </div>
-                    )}
                 </div>
+
+                {plannedSuggestions.length > 0 && (
+                    <div className="mb-5">
+                        <StudyPlanSuggestions
+                            suggestions={plannedSuggestions}
+                            addingSuggestionId={addingSuggestionId}
+                            addingAll={addingAllSuggestions}
+                            onAddOne={handleAddOneSuggestion}
+                            onAddAll={handleAddAllSuggestions}
+                        />
+                    </div>
+                )}
 
                 <div className="grid gap-5 lg:grid-cols-3">
                     <StressScore analysis={analysis} />
+
+                    <div className="lg:col-span-2">
+                        <ConflictWarnings warnings={warnings} />
+                    </div>
 
                     <div className="lg:col-span-2">
                         <WeekSummary
