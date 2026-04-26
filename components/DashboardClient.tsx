@@ -26,6 +26,8 @@ import type {
 } from "@/lib/types";
 import { StudyPlanSuggestions } from "@/components/StudyPlanSuggestions";
 import { generateStudySuggestions } from "@/lib/studyPlanner";
+import { buildWeekWarnings } from "@/lib/warnings";
+import { ConflictWarnings } from "@/components/ConflictWarnings";
 
 const defaultModelByProvider: Record<AiProvider, string> = {
     ollama: "llama3.2",
@@ -153,6 +155,15 @@ export default function DashboardPage() {
         );
     }, [mergedEvents, selectedWeekStart, availabilitySettings]);
 
+    const warnings = useMemo(() => {
+        return buildWeekWarnings({
+            events: mergedEvents,
+            analysis,
+            plannedSuggestions,
+            weekStart: selectedWeekStart,
+        });
+    }, [mergedEvents, analysis, plannedSuggestions, selectedWeekStart]);
+
     function resetAiOutput() {
         setAiSummary(undefined);
         setAiError(null);
@@ -249,7 +260,10 @@ export default function DashboardPage() {
     }
 
     function handleAutoPlanWeek() {
-        const suggestions = generateStudySuggestions(analysis.freeSlots, 4);
+        const suggestions = generateStudySuggestions(analysis.freeSlots, 4, {
+            events: mergedEvents,
+            weekStart: selectedWeekStart,
+        });
         setPlannedSuggestions(suggestions);
         setCalendarActionMessage(
             suggestions.length > 0
@@ -535,6 +549,10 @@ export default function DashboardPage() {
 
                 <div className="grid gap-5 lg:grid-cols-3">
                     <StressScore analysis={analysis} />
+
+                    <div className="lg:col-span-2">
+                        <ConflictWarnings warnings={warnings} />
+                    </div>
 
                     <div className="lg:col-span-2">
                         <WeekSummary
