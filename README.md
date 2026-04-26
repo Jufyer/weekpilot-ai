@@ -274,4 +274,4 @@ This project taught me a lot about:
 
 WeekPilot AI is built around one simple idea:
 
-**Students should not just see their schedule — they should understand it, improve it, and act on it.**
+**Students should not just see their schedule - they should understand it, improve it, and act on it.**
