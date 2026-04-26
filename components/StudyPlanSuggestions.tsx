@@ -5,6 +5,7 @@ import { PlannedStudySuggestion, StudyTimeDraft } from "@/lib/types";
 
 type Props = {
     suggestions: PlannedStudySuggestion[];
+    addedSuggestionIds?: string[];
     addingSuggestionId?: string | null;
     addingAll?: boolean;
     onAddOne: (draft: StudyTimeDraft, suggestionId: string) => void;
@@ -49,18 +50,19 @@ function toDraft(suggestion: PlannedStudySuggestion): EditableSuggestion {
 
 export function StudyPlanSuggestions({
     suggestions,
+    addedSuggestionIds = [],
     addingSuggestionId,
     addingAll,
     onAddOne,
     onAddAll,
 }: Props) {
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [selectedIds, setSelectedIds] = useState<string[]>(() =>
+        suggestions.map((suggestion) => suggestion.id)
+    );
     const [drafts, setDrafts] = useState<Record<string, EditableSuggestion>>({});
 
-    const effectiveSelectedIds = useMemo(() => {
-        return selectedIds.length > 0 ? selectedIds : suggestions.map((s) => s.id);
-    }, [selectedIds, suggestions]);
+    const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
     function getDraft(suggestion: PlannedStudySuggestion) {
         return drafts[suggestion.id] ?? toDraft(suggestion);
@@ -90,6 +92,14 @@ export function StudyPlanSuggestions({
         );
     }
 
+    function selectAll() {
+        setSelectedIds(suggestions.map((suggestion) => suggestion.id));
+    }
+
+    function selectNone() {
+        setSelectedIds([]);
+    }
+
     function startEditing(suggestion: PlannedStudySuggestion) {
         setDrafts((current) => ({
             ...current,
@@ -114,6 +124,10 @@ export function StudyPlanSuggestions({
     }
 
     function handleAddOne(suggestion: PlannedStudySuggestion) {
+        if (addedSuggestionIds.includes(suggestion.id)) {
+            return;
+        }
+
         const draft = buildStudyDraft(suggestion);
 
         if (new Date(draft.endIso) <= new Date(draft.startIso)) {
@@ -125,7 +139,11 @@ export function StudyPlanSuggestions({
 
     function handleAddAll() {
         const payload = suggestions
-            .filter((suggestion) => effectiveSelectedIds.includes(suggestion.id))
+            .filter(
+                (suggestion) =>
+                    selectedIdSet.has(suggestion.id) &&
+                    !addedSuggestionIds.includes(suggestion.id)
+            )
             .map((suggestion) => ({
                 suggestionId: suggestion.id,
                 draft: buildStudyDraft(suggestion),
@@ -139,6 +157,13 @@ export function StudyPlanSuggestions({
         onAddAll(payload);
     }
 
+    const selectedActiveCount = suggestions.filter(
+        (suggestion) =>
+            selectedIdSet.has(suggestion.id) && !addedSuggestionIds.includes(suggestion.id)
+    ).length;
+
+    const hasAnySelected = selectedActiveCount > 0;
+
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-950 shadow-sm">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -149,13 +174,29 @@ export function StudyPlanSuggestions({
                     </p>
                 </div>
 
-                <button
-                    onClick={handleAddAll}
-                    disabled={addingAll}
-                    className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-slate-400"
-                >
-                    {addingAll ? "Adding all..." : "Add selected to Google Calendar"}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={selectAll}
+                        className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                    >
+                        Select all
+                    </button>
+
+                    <button
+                        onClick={selectNone}
+                        className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                    >
+                        Select none
+                    </button>
+
+                    <button
+                        onClick={handleAddAll}
+                        disabled={addingAll || !hasAnySelected}
+                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-slate-400"
+                    >
+                        {addingAll ? "Adding all..." : `Add selected (${selectedActiveCount})`}
+                    </button>
+                </div>
             </div>
 
             <div className="space-y-4">
@@ -165,8 +206,19 @@ export function StudyPlanSuggestions({
 
                     const previewStartIso = toIso(draft.date, draft.startTime);
                     const previewEndIso = toIso(draft.date, draft.endTime);
-                    const invalidRange =
-                        new Date(previewEndIso) <= new Date(previewStartIso);
+                    const previewStart = new Date(previewStartIso);
+                    const previewEnd = new Date(previewEndIso);
+                    const invalidDate =
+                        Number.isNaN(previewStart.getTime()) || Number.isNaN(previewEnd.getTime());
+                    const invalidRange = invalidDate || previewEnd <= previewStart;
+                    const isAdded = addedSuggestionIds.includes(suggestion.id);
+                    const originalDraft = toDraft(suggestion);
+                    const isEdited =
+                        draft.title !== originalDraft.title ||
+                        draft.description !== originalDraft.description ||
+                        draft.date !== originalDraft.date ||
+                        draft.startTime !== originalDraft.startTime ||
+                        draft.endTime !== originalDraft.endTime;
 
                     const previewMinutes = Math.max(
                         0,
@@ -182,13 +234,40 @@ export function StudyPlanSuggestions({
                             <div className="flex flex-wrap items-start gap-3">
                                 <input
                                     type="checkbox"
-                                    checked={effectiveSelectedIds.includes(suggestion.id)}
+                                    checked={selectedIdSet.has(suggestion.id)}
                                     onChange={() => toggleSelected(suggestion.id)}
                                     className="mt-1 h-4 w-4"
                                 />
 
                                 <div className="flex-1">
-                                    <p className="font-semibold">{draft.title}</p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-semibold">{draft.title}</p>
+
+                                        {!isAdded && (
+                                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-900">
+                                                New
+                                            </span>
+                                        )}
+
+                                        {isAdded && (
+                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">
+                                                Added
+                                            </span>
+                                        )}
+
+                                        {isEdited && (
+                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                                                Edited
+                                            </span>
+                                        )}
+
+                                        {selectedIdSet.has(suggestion.id) && (
+                                            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-900">
+                                                Selected
+                                            </span>
+                                        )}
+                                    </div>
+
                                     <p className="text-sm text-slate-600">
                                         {draft.date} · {draft.startTime} - {draft.endTime} · {previewMinutes} min
                                     </p>
@@ -280,7 +359,9 @@ export function StudyPlanSuggestions({
 
                                         {invalidRange && (
                                             <p className="mt-2 font-medium text-red-700">
-                                                End time must be after start time.
+                                                {invalidDate
+                                                    ? "Please enter a valid date and time."
+                                                    : "End time must be after start time."}
                                             </p>
                                         )}
                                     </div>
@@ -299,12 +380,18 @@ export function StudyPlanSuggestions({
 
                                 <button
                                     onClick={() => handleAddOne(suggestion)}
-                                    disabled={addingSuggestionId === suggestion.id || invalidRange}
+                                    disabled={
+                                        addingSuggestionId === suggestion.id ||
+                                        invalidRange ||
+                                        isAdded
+                                    }
                                     className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400"
                                 >
-                                    {addingSuggestionId === suggestion.id
-                                        ? "Adding..."
-                                        : "Add this block"}
+                                    {isAdded
+                                        ? "Added"
+                                        : addingSuggestionId === suggestion.id
+                                            ? "Adding..."
+                                            : "Add this block"}
                                 </button>
                             </div>
                         </div>

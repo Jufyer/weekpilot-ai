@@ -20,13 +20,16 @@ import type {
     AiProvider,
     AvailabilitySettings as AvailabilitySettingsType,
     CalendarEvent,
-    FreeSlot,
     PlannedStudySuggestion,
     StructuredAiSummary,
     StudyTimeDraft,
 } from "@/lib/types";
 import { StudyPlanSuggestions } from "@/components/StudyPlanSuggestions";
 import { generateStudySuggestions } from "@/lib/studyPlanner";
+import { buildWeekWarnings } from "@/lib/warnings";
+import { ConflictWarnings } from "@/components/ConflictWarnings";
+import { KpiStrip } from "@/components/KpiStrip";
+import { WeekDayOverview } from "@/components/WeekDayOverview";
 
 const defaultModelByProvider: Record<AiProvider, string> = {
     ollama: "llama3.2",
@@ -90,6 +93,7 @@ export default function DashboardPage() {
     }, [selectedWeekStart]);
 
     const [plannedSuggestions, setPlannedSuggestions] = useState<PlannedStudySuggestion[]>([]);
+    const [addedSuggestionIds, setAddedSuggestionIds] = useState<string[]>([]);
     const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null);
     const [addingAllSuggestions, setAddingAllSuggestions] = useState(false);
 
@@ -154,6 +158,15 @@ export default function DashboardPage() {
         );
     }, [mergedEvents, selectedWeekStart, availabilitySettings]);
 
+    const warnings = useMemo(() => {
+        return buildWeekWarnings({
+            events: mergedEvents,
+            analysis,
+            plannedSuggestions,
+            weekStart: selectedWeekStart,
+        });
+    }, [mergedEvents, analysis, plannedSuggestions, selectedWeekStart]);
+
     function resetAiOutput() {
         setAiSummary(undefined);
         setAiError(null);
@@ -163,24 +176,28 @@ export default function DashboardPage() {
         setWeekOffset((value) => value - 1);
         resetAiOutput();
         setPlannedSuggestions([]);
+        setAddedSuggestionIds([]);
     }
 
     function goNextWeek() {
         setWeekOffset((value) => value + 1);
         resetAiOutput();
         setPlannedSuggestions([]);
+        setAddedSuggestionIds([]);
     }
 
     function goThisWeek() {
         setWeekOffset(0);
         resetAiOutput();
         setPlannedSuggestions([]);
+        setAddedSuggestionIds([]);
     }
 
     function handleAvailabilitySettingsChange(next: AvailabilitySettingsType) {
         setAvailabilitySettings(next);
         resetAiOutput();
         setPlannedSuggestions([]);
+        setAddedSuggestionIds([]);
     }
 
     function handleProviderChange(provider: AiProvider) {
@@ -250,8 +267,12 @@ export default function DashboardPage() {
     }
 
     function handleAutoPlanWeek() {
-        const suggestions = generateStudySuggestions(analysis.freeSlots, 4);
+        const suggestions = generateStudySuggestions(analysis.freeSlots, 4, {
+            events: mergedEvents,
+            weekStart: selectedWeekStart,
+        });
         setPlannedSuggestions(suggestions);
+        setAddedSuggestionIds([]);
         setCalendarActionMessage(
             suggestions.length > 0
                 ? "WeekPilot generated study block suggestions."
@@ -293,8 +314,8 @@ export default function DashboardPage() {
             await createCalendarEventFromDraft(draft);
             await refreshCalendarEvents();
 
-            setPlannedSuggestions((current) =>
-                current.filter((suggestion) => suggestion.id !== suggestionId)
+            setAddedSuggestionIds((current) =>
+                current.includes(suggestionId) ? current : [...current, suggestionId]
             );
 
             setCalendarActionMessage("Study block was added to Google Calendar.");
@@ -323,7 +344,14 @@ export default function DashboardPage() {
             }
 
             await refreshCalendarEvents();
-            setPlannedSuggestions([]);
+
+            setAddedSuggestionIds((current) => {
+                const next = new Set(current);
+                for (const item of drafts) {
+                    next.add(item.suggestionId);
+                }
+                return [...next];
+            });
 
             setCalendarActionMessage("Selected study blocks were added to Google Calendar.");
             resetAiOutput();
@@ -505,35 +533,52 @@ export default function DashboardPage() {
                 <div className="mb-5 flex flex-wrap gap-3">
                     <button
                         onClick={handleAutoPlanWeek}
-                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white"
+                        disabled={analysis.freeSlots.length === 0}
+                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-slate-400"
                     >
                         Auto-plan my week
                     </button>
 
                     {plannedSuggestions.length > 0 && (
                         <button
-                            onClick={() => setPlannedSuggestions([])}
+                            onClick={() => {
+                                setPlannedSuggestions([]);
+                                setAddedSuggestionIds([]);
+                            }}
                             className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900"
                         >
                             Clear suggestions
                         </button>
                     )}
 
-                    {plannedSuggestions.length > 0 && (
-                        <div className="mb-5">
-                            <StudyPlanSuggestions
-                                suggestions={plannedSuggestions}
-                                addingSuggestionId={addingSuggestionId}
-                                addingAll={addingAllSuggestions}
-                                onAddOne={handleAddOneSuggestion}
-                                onAddAll={handleAddAllSuggestions}
-                            />
-                        </div>
-                    )}
                 </div>
+
+                <KpiStrip
+                    loadScore={analysis.loadScore}
+                    freeStudySlots={analysis.freeSlots.length}
+                    warningsCount={warnings.length}
+                    plannedStudyBlocks={plannedSuggestions.length}
+                />
+
+                {plannedSuggestions.length > 0 && (
+                    <div className="mb-5">
+                        <StudyPlanSuggestions
+                            suggestions={plannedSuggestions}
+                            addedSuggestionIds={addedSuggestionIds}
+                            addingSuggestionId={addingSuggestionId}
+                            addingAll={addingAllSuggestions}
+                            onAddOne={handleAddOneSuggestion}
+                            onAddAll={handleAddAllSuggestions}
+                        />
+                    </div>
+                )}
 
                 <div className="grid gap-5 lg:grid-cols-3">
                     <StressScore analysis={analysis} />
+
+                    <div className="lg:col-span-2">
+                        <ConflictWarnings warnings={warnings} />
+                    </div>
 
                     <div className="lg:col-span-2">
                         <WeekSummary
@@ -553,6 +598,8 @@ export default function DashboardPage() {
                         onAddStudySlot={handleAddStudySlot}
                         addingSlotId={addingSlotId}
                     />
+
+                    <WeekDayOverview days={analysis.days} freeSlots={analysis.freeSlots} />
                 </div>
             </div>
         </main>
