@@ -17,7 +17,6 @@ export function generateStudySuggestions(
   options?: PlannerOptions
 ): PlannedStudySuggestion[] {
   const boundedMax = Math.min(4, Math.max(2, maxSuggestions));
-
   const criticalDateKeys =
     options?.events && options?.weekStart
       ? extractCriticalDates(options.events, options.weekStart)
