@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AiSettings } from "@/components/AiSettings";
 import { AuthButtons } from "@/components/AuthButtons";
 import { EventList } from "@/components/EventList";
 import { FreeSlots } from "@/components/FreeSlots";
@@ -8,8 +9,18 @@ import { StressScore } from "@/components/StressScore";
 import { WeekSummary } from "@/components/WeekSummary";
 import { analyzeCalendar } from "@/lib/calendarAnalyzer";
 import { demoEvents } from "@/lib/demoEvents";
-import { CalendarEvent } from "@/lib/types";
-import { addDays, formatWeekRange, getDefaultPlanningWeek } from "@/lib/dateUtils";
+import { AiProvider, CalendarEvent, StructuredAiSummary } from "@/lib/types";
+import {
+    addDays,
+    formatWeekRange,
+    getDefaultPlanningWeek,
+} from "@/lib/dateUtils";
+
+const defaultModelByProvider: Record<AiProvider, string> = {
+    ollama: "llama3.2",
+    openai: "gpt-4o-mini",
+    deepseek: "deepseek-chat",
+};
 
 export default function DashboardPage() {
     const [events, setEvents] = useState<CalendarEvent[]>(demoEvents);
@@ -19,8 +30,12 @@ export default function DashboardPage() {
     const [usingDemoData, setUsingDemoData] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const [aiSummary, setAiSummary] = useState<string | undefined>();
+    const [aiProvider, setAiProvider] = useState<AiProvider>("ollama");
+    const [aiModel, setAiModel] = useState("llama3.2");
+    const [apiKey, setApiKey] = useState("");
+    const [aiSummary, setAiSummary] = useState<StructuredAiSummary | undefined>();
     const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
 
     const selectedWeekStart = useMemo(() => {
         return addDays(baseWeekStart, weekOffset * 7);
@@ -34,6 +49,7 @@ export default function DashboardPage() {
         async function loadCalendar() {
             setLoading(true);
             setError(null);
+            setAiSummary(undefined);
 
             try {
                 const params = new URLSearchParams({
@@ -63,41 +79,54 @@ export default function DashboardPage() {
         loadCalendar();
     }, [selectedWeekStart, selectedWeekEnd]);
 
-    const analysis = analyzeCalendar(events, selectedWeekStart);
+    const analysis = useMemo(() => {
+        return analyzeCalendar(events, selectedWeekStart);
+    }, [events, selectedWeekStart]);
 
-    useEffect(() => {
-        async function loadAiSummary() {
-            setAiLoading(true);
+    async function generateAiSummary() {
+        setAiLoading(true);
+        setAiError(null);
 
-            try {
-                const response = await fetch("/api/ai-summary", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        events,
-                        analysis,
-                    }),
-                });
+        try {
+            const response = await fetch("/api/ai-summary", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    events,
+                    analysis,
+                    provider: aiProvider,
+                    model: aiModel,
+                    apiKey,
+                }),
+            });
 
-                if (!response.ok) {
-                    throw new Error("Could not generate summary");
-                }
-
+            if (!response.ok) {
                 const data = await response.json();
-                setAiSummary(data.summary);
-            } catch {
-                setAiSummary(undefined);
-            } finally {
-                setAiLoading(false);
+                throw new Error(data.error ?? "Could not generate summary");
             }
-        }
 
-        if (!loading) {
-            loadAiSummary();
+            const data = await response.json();
+            setAiSummary(data.summary);
+        } catch (error) {
+            setAiError(
+                error instanceof Error
+                    ? error.message
+                    : "Could not generate AI summary"
+            );
+            setAiSummary(undefined);
+        } finally {
+            setAiLoading(false);
         }
-    }, [events, loading]);
+    }
+
+    function handleProviderChange(provider: AiProvider) {
+        setAiProvider(provider);
+        setAiModel(defaultModelByProvider[provider]);
+        setAiSummary(undefined);
+        setAiError(null);
+    }
 
     return (
         <main className="min-h-screen bg-slate-100 px-6 py-8 text-slate-950">
@@ -176,6 +205,19 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
+                <div className="mb-5">
+                    <AiSettings
+                        provider={aiProvider}
+                        model={aiModel}
+                        apiKey={apiKey}
+                        loading={aiLoading}
+                        onProviderChange={handleProviderChange}
+                        onModelChange={setAiModel}
+                        onApiKeyChange={setApiKey}
+                        onGenerate={generateAiSummary}
+                    />
+                </div>
+
                 <div className="grid gap-5 lg:grid-cols-3">
                     <StressScore analysis={analysis} />
 
@@ -184,6 +226,7 @@ export default function DashboardPage() {
                             analysis={analysis}
                             aiSummary={aiSummary}
                             loading={aiLoading}
+                            error={aiError}
                         />
                     </div>
 

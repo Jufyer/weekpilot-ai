@@ -29,3 +29,14 @@ export type CalendarAnalysis = {
     days: DayLoad[];
     freeSlots: FreeSlot[];
 };
+
+export type AiProvider = "ollama" | "openai" | "deepseek";
+
+export type StructuredAiSummary = {
+    overview: string;
+    risks: string[];
+    studyPlan: string[];
+    recommendation: string;
+    provider: AiProvider | "fallback";
+    model: string;
+};
