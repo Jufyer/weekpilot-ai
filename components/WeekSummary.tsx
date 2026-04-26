@@ -8,7 +8,7 @@ export function WeekSummary({ analysis }: Props) {
     const hours = Math.round((analysis.totalScheduledMinutes / 60) * 10) / 10;
 
     return (
-        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border bg-white p-5 shadow-sm text-slate-950">
             <h2 className="mb-4 text-xl font-semibold">AI week summary</h2>
 
             <p className="leading-7 text-gray-700">

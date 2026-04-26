@@ -6,7 +6,7 @@ type Props = {
 
 export function FreeSlots({ slots }: Props) {
     return (
-        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border bg-white p-5 shadow-sm text-slate-950">
             <h2 className="mb-4 text-xl font-semibold">Suggested study slots</h2>
 
             <div className="space-y-3">

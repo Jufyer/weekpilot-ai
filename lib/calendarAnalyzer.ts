@@ -1,27 +1,42 @@
 import { CalendarAnalysis, CalendarEvent, DayLoad, FreeSlot } from "@/lib/types";
+import { addDays, getMonday } from "@/lib/dateUtils";
 
 function minutesBetween(start: Date, end: Date) {
     return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
 }
 
 function toDateKey(date: Date) {
-    return date.toISOString().split("T")[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
 }
 
 function getWeekday(date: Date) {
     return date.toLocaleDateString("en-US", { weekday: "long" });
 }
 
-function getWeekStart(events: CalendarEvent[]) {
-    const firstEventDate = new Date(events[0].start);
-    const day = firstEventDate.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
+function getWeekStart(events: CalendarEvent[], selectedWeekStart?: Date) {
+    if (selectedWeekStart) {
+        return getMonday(selectedWeekStart);
+    }
 
-    const monday = new Date(firstEventDate);
-    monday.setDate(firstEventDate.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
+    if (events.length === 0) {
+        return getMonday(new Date());
+    }
 
-    return monday;
+    return getMonday(new Date(events[0].start));
+}
+
+function getEventsInWeek(events: CalendarEvent[], weekStart: Date) {
+    const weekEnd = addDays(weekStart, 7);
+
+    return events.filter((event) => {
+        const eventStart = new Date(event.start);
+
+        return eventStart >= weekStart && eventStart < weekEnd;
+    });
 }
 
 function getEventsForDay(events: CalendarEvent[], date: Date) {
@@ -41,6 +56,7 @@ function findFreeSlots(events: CalendarEvent[], weekStart: Date): FreeSlot[] {
         currentDay.setDate(weekStart.getDate() + i);
 
         const dayEvents = getEventsForDay(events, currentDay)
+            .filter((event) => !event.allDay)
             .map((event) => ({
                 start: new Date(event.start),
                 end: new Date(event.end),
@@ -107,8 +123,12 @@ function findFreeSlots(events: CalendarEvent[], weekStart: Date): FreeSlot[] {
     return freeSlots;
 }
 
-export function analyzeCalendar(events: CalendarEvent[]): CalendarAnalysis {
-    const weekStart = getWeekStart(events);
+export function analyzeCalendar(
+    events: CalendarEvent[],
+    selectedWeekStart?: Date
+): CalendarAnalysis {
+    const weekStart = getWeekStart(events, selectedWeekStart);
+    const weekEvents = getEventsInWeek(events, weekStart);
 
     const days: DayLoad[] = [];
 
@@ -116,9 +136,13 @@ export function analyzeCalendar(events: CalendarEvent[]): CalendarAnalysis {
         const currentDay = new Date(weekStart);
         currentDay.setDate(weekStart.getDate() + i);
 
-        const dayEvents = getEventsForDay(events, currentDay);
+        const dayEvents = getEventsForDay(weekEvents, currentDay);
 
         const scheduledMinutes = dayEvents.reduce((sum, event) => {
+            if (event.allDay) {
+                return sum;
+            }
+
             return sum + minutesBetween(new Date(event.start), new Date(event.end));
         }, 0);
 
@@ -139,17 +163,20 @@ export function analyzeCalendar(events: CalendarEvent[]): CalendarAnalysis {
         return day.scheduledMinutes > max.scheduledMinutes ? day : max;
     }, days[0]);
 
-    const freeSlots = findFreeSlots(events, weekStart);
+    const freeSlots = findFreeSlots(weekEvents, weekStart);
 
     const totalHours = totalScheduledMinutes / 60;
 
     const loadScore = Math.min(
         100,
-        Math.max(0, Math.round(totalHours * 5 + events.length * 3 - freeSlots.length * 2))
+        Math.max(
+            0,
+            Math.round(totalHours * 5 + weekEvents.length * 3 - freeSlots.length * 2)
+        )
     );
 
     return {
-        totalEvents: events.length,
+        totalEvents: weekEvents.length,
         totalScheduledMinutes,
         loadScore,
         busiestDay,

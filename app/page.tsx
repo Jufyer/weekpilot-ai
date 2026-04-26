@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthButtons } from "@/components/AuthButtons";
 
 export default function HomePage() {
   return (
@@ -23,6 +24,9 @@ export default function HomePage() {
         >
           Open dashboard
         </Link>
+        <div className="mt-8">
+          <AuthButtons />
+        </div>
       </div>
     </main>
   );
