@@ -1,3 +1,5 @@
+![icon](https://github.com/[username]/[reponame]/blob/[branch]/image.jpg?raw=true)
+
 # WeekPilot AI
 
 **WeekPilot AI** turns Google Calendar data into a smart weekly action plan for students.
