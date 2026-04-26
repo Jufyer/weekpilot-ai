@@ -4,6 +4,10 @@
 
 Instead of only showing events, WeekPilot helps users understand their week, detect overload, find realistic study time, and turn suggestions into actual calendar events.
 
+## Quick pitch
+
+WeekPilot AI helps students understand their weekly workload, find realistic study time, detect planning risks, and turn suggested study blocks into real Google Calendar events.
+
 ## Why I built this
 
 As a student, I noticed that having a calendar does not automatically mean being organized.
@@ -41,6 +45,15 @@ WeekPilot AI connects to Google Calendar and helps students plan their week more
   - supports editing before saving
   - supports adding one or multiple study blocks to Google Calendar
 - KPI strip and day-by-day weekly overview for fast understanding
+
+## Demo highlights
+
+- Connect Google Calendar
+- Add sleep and recurring offline commitments
+- Generate AI week summary
+- Detect warnings and overloaded days
+- Auto-plan study blocks
+- Edit and add study blocks to Google Calendar
 
 ## How it works
 
@@ -98,38 +111,26 @@ It also prioritizes better study opportunities by considering:
 
 ## Running locally
 
-## Google OAuth setup for local development
+### 1. Install dependencies
 
-If you want to run WeekPilot AI locally, you need to create Google OAuth credentials so the app can access your calendar through your own Google account.
-
-### 1. Create a Google Cloud project
-
-Open the Google Cloud Console and create a new project for the app. Then enable the **Google Calendar API** for that project.
-
-### 2. Configure the OAuth consent screen
-
-In Google Cloud Console, open the OAuth consent configuration and fill in the app information.
-
-For local testing, using an **External** app in **Testing** mode is enough. Add your own Google email address under **Test users**, otherwise login may fail during development.
-
-### 3. Create OAuth credentials
-
-Create a new **OAuth Client ID** and choose **Web application** as the application type.
-For local development with NextAuth/Auth.js, set this redirect URI:
-
-```txt
-http://localhost:3000/api/auth/callback/google
+```bash
+npm install
 ```
 
-### 4. Copy your credentials into `.env.local`
+### 2. Create `.env.local`
 
-Add your Google client credentials to `.env.local`:
+Create a `.env.local` file with the required keys.
+
+Example:
 
 ```env
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-NEXTAUTH_SECRET=your_random_secret
+NEXTAUTH_SECRET=your_secret
 NEXTAUTH_URL=http://localhost:3000
+
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
 ```
 
 You can generate `NEXTAUTH_SECRET` with:
@@ -138,14 +139,40 @@ You can generate `NEXTAUTH_SECRET` with:
 openssl rand -base64 32
 ```
 
-### 5. Make sure the app requests the right calendar scope
+### 3. Google OAuth setup for local development
+
+If you want to run WeekPilot AI locally, you need to create Google OAuth credentials so the app can access your calendar through your own Google account.
+
+#### Create a Google Cloud project
+
+Open the Google Cloud Console and create a new project for the app. Then enable the **Google Calendar API** for that project.
+
+#### Configure the OAuth consent screen
+
+In Google Cloud Console, open the OAuth consent configuration and fill in the app information.
+
+For local testing, using an **External** app in **Testing** mode is enough. Add your own Google email address under **Test users**, otherwise login may fail during development.
+
+#### Create OAuth credentials
+
+Create a new **OAuth Client ID** and choose **Web application** as the application type.
+For local development with NextAuth/Auth.js, set this redirect URI:
+
+```txt
+http://localhost:3000/api/auth/callback/google
+```
+
+#### Make sure the app requests the right calendar scope
 
 WeekPilot needs Google Calendar permissions to read events and create study blocks. The Google provider setup in `lib/auth.ts` should request calendar access that allows both reading and creating events.
 
-### 6. Start the app
+#### Why this setup matters
+
+WeekPilot uses user-authorized OAuth instead of asking for passwords directly. That means users keep control over their Google account, and the app only receives the permissions it actually requests.
+
+### 4. Start the development server
 
 ```bash
-npm install
 npm run dev
 ```
 
@@ -157,7 +184,7 @@ http://localhost:3000
 
 Click **Connect Google Calendar** and sign in with the Google account you added as a test user.
 
-### 7. If login still fails
+### 5. If login still fails
 
 Common causes:
 
@@ -166,12 +193,7 @@ Common causes:
 - the Calendar API is not enabled
 - you changed scopes and need to sign out and sign in again so Google issues a new token with the updated permissions
 
-### Why this setup matters
-
-WeekPilot uses user-authorized OAuth instead of asking for passwords directly.
-That means users keep control over their Google account, and the app only receives the permissions it actually requests.
-
-### Full local demo test flow
+### 6. Full local demo test flow
 
 After setup, a local end-to-end demo can be tested like this:
 
@@ -189,37 +211,7 @@ After setup, a local end-to-end demo can be tested like this:
 
 This gives a complete local demonstration of the main product flow: connect calendar, analyze week, plan study time, and turn suggestions into action.
 
-### 1. Install dependencies
-
-### 1. Install dependencies
-
-```bash
-npm install
-```
-
-### 2. Set up environment variables
-
-Create a `.env.local` file with the required keys.
-
-Example:
-
-```env
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-NEXTAUTH_SECRET=your_secret
-NEXTAUTH_URL=http://localhost:3000
-
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
-```
-
-### 3. Start development server
-
-```bash
-npm run dev
-```
-
-### 4. Build for production
+### 7. Build for production
 
 ```bash
 npm run build
@@ -254,7 +246,7 @@ Some of the biggest challenges were:
 This project taught me a lot about:
 
 - working with real APIs and authentication
-- calendar/time-based logic
+- calendar and time-based logic
 - balancing deterministic rules with AI output
 - building around a real user problem instead of adding AI for its own sake
 - turning analysis into action
@@ -264,10 +256,10 @@ This project taught me a lot about:
 - subject-specific study planning
 - exam-aware prioritization
 - recurring study habits
-- better visual timeline / heatmap
+- better visual timeline or heatmap
 - mobile optimization
 - school-specific modes
-- collaboration / parent or tutor visibility
+- collaboration or parent/tutor visibility
 - notifications before overloaded days
 
 ## Final idea
