@@ -9,6 +9,8 @@ export function generateStudySuggestions(
     slots: FreeSlot[],
     maxSuggestions = 4
 ): PlannedStudySuggestion[] {
+    const boundedMax = Math.min(4, Math.max(2, maxSuggestions));
+
     const rankedSlots = [...slots]
         .filter((slot) => slot.durationMinutes >= 45)
         .sort((a, b) => {
@@ -16,12 +18,10 @@ export function generateStudySuggestions(
             const scoreB = b.durationMinutes - dayPriority(b.date) * 8;
             return scoreB - scoreA;
         })
-        .slice(0, maxSuggestions);
+        .slice(0, boundedMax);
 
     return rankedSlots.map((slot, index) => {
         const start = new Date(slot.startIso);
-        const end = new Date(slot.endIso);
-
         const durationMinutes = Math.min(
             slot.durationMinutes >= 120 ? 90 : slot.durationMinutes,
             120

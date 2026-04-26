@@ -55,12 +55,12 @@ export function StudyPlanSuggestions({
     onAddAll,
 }: Props) {
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [selectedIds, setSelectedIds] = useState<string[]>(() =>
+        suggestions.map((suggestion) => suggestion.id)
+    );
     const [drafts, setDrafts] = useState<Record<string, EditableSuggestion>>({});
 
-    const effectiveSelectedIds = useMemo(() => {
-        return selectedIds.length > 0 ? selectedIds : suggestions.map((s) => s.id);
-    }, [selectedIds, suggestions]);
+    const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
     function getDraft(suggestion: PlannedStudySuggestion) {
         return drafts[suggestion.id] ?? toDraft(suggestion);
@@ -88,6 +88,14 @@ export function StudyPlanSuggestions({
                 ? current.filter((value) => value !== id)
                 : [...current, id]
         );
+    }
+
+    function selectAll() {
+        setSelectedIds(suggestions.map((suggestion) => suggestion.id));
+    }
+
+    function selectNone() {
+        setSelectedIds([]);
     }
 
     function startEditing(suggestion: PlannedStudySuggestion) {
@@ -125,7 +133,7 @@ export function StudyPlanSuggestions({
 
     function handleAddAll() {
         const payload = suggestions
-            .filter((suggestion) => effectiveSelectedIds.includes(suggestion.id))
+            .filter((suggestion) => selectedIdSet.has(suggestion.id))
             .map((suggestion) => ({
                 suggestionId: suggestion.id,
                 draft: buildStudyDraft(suggestion),
@@ -139,6 +147,8 @@ export function StudyPlanSuggestions({
         onAddAll(payload);
     }
 
+    const hasAnySelected = selectedIds.length > 0;
+
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-950 shadow-sm">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -149,13 +159,29 @@ export function StudyPlanSuggestions({
                     </p>
                 </div>
 
-                <button
-                    onClick={handleAddAll}
-                    disabled={addingAll}
-                    className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-slate-400"
-                >
-                    {addingAll ? "Adding all..." : "Add selected to Google Calendar"}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        onClick={selectAll}
+                        className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                    >
+                        Select all
+                    </button>
+
+                    <button
+                        onClick={selectNone}
+                        className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                    >
+                        Select none
+                    </button>
+
+                    <button
+                        onClick={handleAddAll}
+                        disabled={addingAll || !hasAnySelected}
+                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-slate-400"
+                    >
+                        {addingAll ? "Adding all..." : `Add selected (${selectedIds.length})`}
+                    </button>
+                </div>
             </div>
 
             <div className="space-y-4">
@@ -165,8 +191,11 @@ export function StudyPlanSuggestions({
 
                     const previewStartIso = toIso(draft.date, draft.startTime);
                     const previewEndIso = toIso(draft.date, draft.endTime);
-                    const invalidRange =
-                        new Date(previewEndIso) <= new Date(previewStartIso);
+                    const previewStart = new Date(previewStartIso);
+                    const previewEnd = new Date(previewEndIso);
+                    const invalidDate =
+                        Number.isNaN(previewStart.getTime()) || Number.isNaN(previewEnd.getTime());
+                    const invalidRange = invalidDate || previewEnd <= previewStart;
 
                     const previewMinutes = Math.max(
                         0,
@@ -182,7 +211,7 @@ export function StudyPlanSuggestions({
                             <div className="flex flex-wrap items-start gap-3">
                                 <input
                                     type="checkbox"
-                                    checked={effectiveSelectedIds.includes(suggestion.id)}
+                                    checked={selectedIdSet.has(suggestion.id)}
                                     onChange={() => toggleSelected(suggestion.id)}
                                     className="mt-1 h-4 w-4"
                                 />
@@ -280,7 +309,9 @@ export function StudyPlanSuggestions({
 
                                         {invalidRange && (
                                             <p className="mt-2 font-medium text-red-700">
-                                                End time must be after start time.
+                                                {invalidDate
+                                                    ? "Please enter a valid date and time."
+                                                    : "End time must be after start time."}
                                             </p>
                                         )}
                                     </div>

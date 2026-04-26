@@ -20,7 +20,6 @@ import type {
     AiProvider,
     AvailabilitySettings as AvailabilitySettingsType,
     CalendarEvent,
-    FreeSlot,
     PlannedStudySuggestion,
     StructuredAiSummary,
     StudyTimeDraft,
@@ -505,7 +504,8 @@ export default function DashboardPage() {
                 <div className="mb-5 flex flex-wrap gap-3">
                     <button
                         onClick={handleAutoPlanWeek}
-                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white"
+                        disabled={analysis.freeSlots.length === 0}
+                        className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:bg-slate-400"
                     >
                         Auto-plan my week
                     </button>
@@ -519,18 +519,19 @@ export default function DashboardPage() {
                         </button>
                     )}
 
-                    {plannedSuggestions.length > 0 && (
-                        <div className="mb-5">
-                            <StudyPlanSuggestions
-                                suggestions={plannedSuggestions}
-                                addingSuggestionId={addingSuggestionId}
-                                addingAll={addingAllSuggestions}
-                                onAddOne={handleAddOneSuggestion}
-                                onAddAll={handleAddAllSuggestions}
-                            />
-                        </div>
-                    )}
                 </div>
+
+                {plannedSuggestions.length > 0 && (
+                    <div className="mb-5">
+                        <StudyPlanSuggestions
+                            suggestions={plannedSuggestions}
+                            addingSuggestionId={addingSuggestionId}
+                            addingAll={addingAllSuggestions}
+                            onAddOne={handleAddOneSuggestion}
+                            onAddAll={handleAddAllSuggestions}
+                        />
+                    </div>
+                )}
 
                 <div className="grid gap-5 lg:grid-cols-3">
                     <StressScore analysis={analysis} />
