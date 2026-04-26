@@ -1,4 +1,4 @@
-import { CalendarAnalysis, CalendarEvent, DayLoad, FreeSlot } from "@/lib/types";
+import { AvailabilitySettings, CalendarAnalysis, CalendarEvent, DayLoad, FreeSlot } from "@/lib/types";
 import { addDays, getMonday } from "@/lib/dateUtils";
 
 function minutesBetween(start: Date, end: Date) {
@@ -48,7 +48,11 @@ function getEventsForDay(events: CalendarEvent[], date: Date) {
     });
 }
 
-function findFreeSlots(events: CalendarEvent[], weekStart: Date): FreeSlot[] {
+function findFreeSlots(
+    events: CalendarEvent[],
+    weekStart: Date,
+    settings?: AvailabilitySettings
+): FreeSlot[] {
     const freeSlots: FreeSlot[] = [];
 
     for (let i = 0; i < 7; i++) {
@@ -63,11 +67,21 @@ function findFreeSlots(events: CalendarEvent[], weekStart: Date): FreeSlot[] {
             }))
             .sort((a, b) => a.start.getTime() - b.start.getTime());
 
+        const wakeTime = settings?.sleepEnd ?? "07:00";
+        const sleepTime = settings?.sleepStart ?? "23:00";
+
+        const [wakeHour, wakeMinute] = wakeTime.split(":").map(Number);
+        const [sleepHour, sleepMinute] = sleepTime.split(":").map(Number);
+
         const studyStart = new Date(currentDay);
-        studyStart.setHours(15, 0, 0, 0);
+        studyStart.setHours(wakeHour, wakeMinute, 0, 0);
 
         const studyEnd = new Date(currentDay);
-        studyEnd.setHours(21, 0, 0, 0);
+        studyEnd.setHours(sleepHour, sleepMinute, 0, 0);
+
+        if (studyEnd <= studyStart) {
+            studyEnd.setDate(studyEnd.getDate() + 1);
+        }
 
         let pointer = studyStart;
 
@@ -90,6 +104,8 @@ function findFreeSlots(events: CalendarEvent[], weekStart: Date): FreeSlot[] {
                             hour: "2-digit",
                             minute: "2-digit",
                         }),
+                        startIso: pointer.toISOString(),
+                        endIso: event.start.toISOString(),
                         durationMinutes: duration,
                     });
                 }
@@ -114,6 +130,8 @@ function findFreeSlots(events: CalendarEvent[], weekStart: Date): FreeSlot[] {
                         hour: "2-digit",
                         minute: "2-digit",
                     }),
+                    startIso: pointer.toISOString(),
+                    endIso: studyEnd.toISOString(),
                     durationMinutes: duration,
                 });
             }
@@ -125,7 +143,8 @@ function findFreeSlots(events: CalendarEvent[], weekStart: Date): FreeSlot[] {
 
 export function analyzeCalendar(
     events: CalendarEvent[],
-    selectedWeekStart?: Date
+    selectedWeekStart?: Date,
+    settings?: AvailabilitySettings
 ): CalendarAnalysis {
     const weekStart = getWeekStart(events, selectedWeekStart);
     const weekEvents = getEventsInWeek(events, weekStart);
@@ -163,7 +182,7 @@ export function analyzeCalendar(
         return day.scheduledMinutes > max.scheduledMinutes ? day : max;
     }, days[0]);
 
-    const freeSlots = findFreeSlots(weekEvents, weekStart);
+    const freeSlots = findFreeSlots(weekEvents, weekStart, settings);
 
     const totalHours = totalScheduledMinutes / 60;
 

@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
 export const authOptions: NextAuthOptions = {
@@ -9,7 +9,7 @@ export const authOptions: NextAuthOptions = {
             authorization: {
                 params: {
                     scope:
-                        "openid email profile https://www.googleapis.com/auth/calendar.readonly",
+                        "openid email profile https://www.googleapis.com/auth/calendar.events",
                     access_type: "offline",
                     prompt: "consent",
                 },
