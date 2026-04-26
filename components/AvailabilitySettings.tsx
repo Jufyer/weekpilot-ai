@@ -1,10 +1,13 @@
 "use client";
 
-import { AvailabilitySettings, RecurringBlock } from "@/lib/types";
+import type {
+    AvailabilitySettings as AvailabilitySettingsType,
+    RecurringBlock,
+} from "@/lib/types";
 
 type Props = {
-    settings: AvailabilitySettings;
-    onChange: (settings: AvailabilitySettings) => void;
+    settings: AvailabilitySettingsType;
+    onChange: (settings: AvailabilitySettingsType) => void;
 };
 
 const weekdays = [
